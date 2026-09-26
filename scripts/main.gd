@@ -25,6 +25,9 @@ var _score_labels: Array[Label] = []
 var _message: Label
 var _lobby: Control
 var _slot_labels: Array[Label] = []
+var _qr_rect: TextureRect
+var _url_label: Label
+var _how_label: Label
 
 
 func _ready() -> void:
@@ -42,6 +45,8 @@ func _ready() -> void:
 	PhoneControllers.player_disconnected.connect(func(_id: int) -> void: _refresh_names())
 	PhoneControllers.player_reconnected.connect(func(_id: int) -> void: _refresh_names())
 	PhoneControllers.button_pressed.connect(_on_phone_button)
+	PhoneControllers.status_changed.connect(func(_ok: bool, _msg: String) -> void: _update_join_info())
+	_update_join_info()
 	_show_lobby()
 
 
@@ -219,6 +224,19 @@ func _draw() -> void:
 
 # --- HUD & lobby ------------------------------------------------------------
 
+## QR code + join instructions; in relay mode they appear once the relay has given us a room.
+func _update_join_info() -> void:
+	if _qr_rect == null:
+		return
+	if PhoneControllers.can_join:
+		_qr_rect.texture = PhoneControllers.make_qr_texture(10)
+		_url_label.text = PhoneControllers.get_join_url()
+		_how_label.text = "Scan the code with your phone to grab a fighter.\n" + PhoneControllers.status_message
+	else:
+		_qr_rect.texture = null
+		_url_label.text = ""
+		_how_label.text = PhoneControllers.status_message
+
 func _build_hud() -> void:
 	var hud := CanvasLayer.new()
 	add_child(hud)
@@ -294,7 +312,7 @@ func _build_lobby() -> void:
 	center.add_child(row)
 
 	var qr := TextureRect.new()
-	qr.texture = PhoneControllers.make_qr_texture(10)
+	_qr_rect = qr
 	qr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	qr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	qr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -312,12 +330,12 @@ func _build_lobby() -> void:
 	col.add_child(title)
 
 	var how := Label.new()
-	how.text = "Scan the code with your phone to grab a fighter.\nPhones must be on the same Wi-Fi as this computer."
+	_how_label = how
 	how.add_theme_color_override("font_color", Color("#8a93a6"))
 	col.add_child(how)
 
 	var url := Label.new()
-	url.text = PhoneControllers.get_join_url()
+	_url_label = url
 	url.add_theme_color_override("font_color", Color("#6b7489"))
 	url.add_theme_font_size_override("font_size", 14)
 	col.add_child(url)

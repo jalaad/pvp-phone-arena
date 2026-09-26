@@ -197,13 +197,20 @@
   // ---------- Config ----------
   const $ = (id) => document.getElementById(id);
   const params = new URLSearchParams(location.search);
-  const SESSION = params.get('s') || '';
+  // Relay mode: page served by the relay as /?r=ROOM; talk back to the same server.
+  // LAN mode: page served by the game itself as /?s=SESSION; talk to its WebSocket port.
+  const ROOM = (params.get('r') || '').toUpperCase();
+  const SESSION = params.get('s') || ROOM;
   // The Godot server replaces this placeholder with its WebSocket port when serving the page.
   const INJECTED_PORT = '__WS_PORT__';
   const WS_PORT = /^\d+$/.test(INJECTED_PORT) ? INJECTED_PORT : (params.get('ws') || '8081');
   const WS_HOST = params.get('host') || location.hostname || 'localhost';
+  const WS_URL = ROOM
+    ? `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/phone/${encodeURIComponent(ROOM)}`
+    : `ws://${WS_HOST}:${WS_PORT}`;
   const DEADZONE = 0.12;
-  const SEND_INTERVAL_MS = 16;
+  // Over the internet relay, 30 updates/s is plenty and halves the traffic.
+  const SEND_INTERVAL_MS = ROOM ? 33 : 16;
   const PING_INTERVAL_MS = 2000;
 
   const REJECT_TEXT = {
@@ -211,6 +218,7 @@
     full: 'The game is full.',
     kicked: 'You were removed from the game.',
     replaced: 'This controller was opened somewhere else.',
+    no_game: 'No game is running with this code. Check the code on screen and scan it again.',
   };
 
   const store = {
@@ -285,7 +293,7 @@
     setStatus(joined ? 'reconnecting' : 'connecting');
     let sock;
     try {
-      sock = new WebSocket(`ws://${WS_HOST}:${WS_PORT}`);
+      sock = new WebSocket(WS_URL);
     } catch {
       scheduleRetry();
       return;
@@ -303,7 +311,11 @@
     sock.onclose = (ev) => {
       if (ws !== sock) return;
       ws = null;
-      const reason = rejected || (REJECT_TEXT[ev.reason] ? ev.reason : null);
+      // The game restarting or briefly losing the relay isn't fatal for a joined phone:
+      // keep retrying and rejoin (same player slot) when it's back.
+      const gameAway = ev.reason === 'host_left' || (joined && ev.reason === 'no_game');
+      $('overlay').textContent = gameAway ? 'Waiting for the game…' : 'Reconnecting…';
+      const reason = rejected || (!gameAway && REJECT_TEXT[ev.reason] ? ev.reason : null);
       if (reason) {
         wantConnected = false;
         releaseAll(false);

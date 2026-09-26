@@ -2,7 +2,14 @@
 
 A 2-player top-down arena duel for **Godot 4.7** where each player's **phone is the controller**.
 Players scan a QR code on the game screen and their phone turns into a joystick with
-ATTACK / SHOOT / BLOCK / DASH buttons. No app install and no internet: everything runs over your local Wi-Fi.
+ATTACK / SHOOT / BLOCK / DASH buttons. No app install.
+
+Two ways phones connect (chosen automatically; see `DEFAULT_MODE` / `DEFAULT_RELAY_URL` at the top of `phone_controller/phone_controller_server.gd`):
+
+| Build | How phones reach the game | Needs |
+|---|---|---|
+| Desktop (Windows/Mac/Linux) | The game hosts the phone page itself | Phones on the **same Wi-Fi**; no internet |
+| Browser (e.g. itch.io) | Through the [relay](relay/README.md) on Cloudflare | Internet; phones on **any** network |
 
 Built from two projects:
 - [godot-phone-controller](https://github.com/jalaad/godot-phone-controller): phone page, WebSocket server, QR code
@@ -11,7 +18,8 @@ Built from two projects:
 ## Play
 
 1. Open this folder in Godot 4.7 and press Play. Allow the Windows Firewall prompt for **Private networks**.
-2. Each player scans the QR code with a phone on the **same Wi-Fi** and taps **Join**.
+   (In the browser build there's no firewall prompt; the QR code appears once the relay connects.)
+2. Each player scans the QR code with a phone (same Wi-Fi for desktop builds) and taps **Join**.
    The first phone becomes Player 1 (blue), the second Player 2 (pink); each phone recolours to match.
 3. The match starts automatically once both phones join.
 

@@ -1,0 +1,4 @@
+node_modules/
+.wrangler/
+# Copied from ../phone_controller/controller.html by `npm run dev` / `npm run deploy`
+public/

@@ -1,0 +1,13 @@
+{
+  "name": "pvp-phone-relay",
+  "private": true,
+  "description": "Relay so the browser build of PvP Phone Arena can reach phones",
+  "scripts": {
+    "sync-page": "node -e \"require('fs').mkdirSync('public',{recursive:true});require('fs').copyFileSync('../phone_controller/controller.html','public/index.html')\"",
+    "dev": "npm run sync-page && wrangler dev",
+    "deploy": "npm run sync-page && wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4"
+  }
+}
