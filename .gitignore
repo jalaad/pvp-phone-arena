@@ -1,0 +1,17 @@
+# Godot 4 cache and import data (regenerated when the project is opened)
+.godot/
+
+# Export output
+/build/
+/export/
+*.apk
+*.aab
+*.pck
+*.exe
+*.zip
+
+# OS / editor clutter
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/

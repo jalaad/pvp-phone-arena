@@ -1,0 +1,17 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
+[ext_resource type="PackedScene" path="res://scenes/fighter.tscn" id="2_fighter"]
+
+[node name="Main" type="Node2D"]
+script = ExtResource("1_main")
+
+[node name="Player1" parent="." instance=ExtResource("2_fighter")]
+position = Vector2(200, 385)
+player_number = 1
+color = Color(0.298, 0.788, 0.941, 1)
+
+[node name="Player2" parent="." instance=ExtResource("2_fighter")]
+position = Vector2(1080, 385)
+player_number = 2
+color = Color(0.969, 0.145, 0.522, 1)

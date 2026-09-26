@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0b0d12">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Controller</title>
+<style>
+  :root {
+    --bg: #0b0d12;
+    --panel: #151923;
+    --line: #262c3a;
+    --text: #e8ecf4;
+    --muted: #8a93a6;
+    --accent: #4cc9f0;
+    --ok: #3ddc84;
+    --warn: #ffb020;
+    --bad: #ff5c5c;
+    --face: clamp(46px, min(17vmin, 12.5vw), 88px);
+    --stick: clamp(110px, 34vmin, 150px);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    background: var(--bg); color: var(--text);
+    font: 500 15px/1.35 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+    overscroll-behavior: none;
+  }
+  body { position: fixed; inset: 0; }
+  button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+  .hidden { display: none !important; }
+  .muted { color: var(--muted); }
+  .screen { position: absolute; inset: 0; }
+
+  /* ---------- Join screen ---------- */
+  #join {
+    display: grid; place-items: center;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+    background: radial-gradient(120% 80% at 50% 0%, #17203a 0%, var(--bg) 60%);
+  }
+  .card {
+    width: min(360px, 100%);
+    background: var(--panel); border: 1px solid var(--line); border-radius: 18px;
+    padding: 24px 20px; display: grid; gap: 14px;
+  }
+  .card h1 { margin: 0; font-size: 22px; letter-spacing: .2px; }
+  .card label { display: grid; gap: 6px; color: var(--muted); font-size: 13px; }
+  .card input {
+    font: inherit; font-size: 18px; color: var(--text);
+    background: var(--bg); border: 1px solid var(--line); border-radius: 12px;
+    padding: 12px 14px; outline: none; touch-action: manipulation;
+    user-select: text; -webkit-user-select: text;
+  }
+  .card input:focus { border-color: var(--accent); }
+  .primary {
+    background: var(--accent); color: #0b0d12; font-weight: 700; font-size: 17px;
+    border-radius: 12px; padding: 14px; touch-action: manipulation;
+  }
+  .primary:disabled { opacity: .5; }
+  #joinStatus { margin: 0; min-height: 1.35em; font-size: 14px; }
+  #joinStatus.error { color: var(--bad); }
+
+  /* ---------- Pad screen ---------- */
+  #pad {
+    display: grid; grid-template-rows: auto 1fr;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    touch-action: none;
+  }
+  #pad::before { /* player colour glow along the top */
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 3px; background: var(--accent);
+  }
+  header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; border-bottom: 1px solid var(--line);
+  }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); flex: none; }
+  .dot.ok { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+  .dot.warn { background: var(--warn); }
+  .dot.bad { background: var(--bad); }
+  #pname { font-weight: 700; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #ping { font-size: 12px; font-variant-numeric: tabular-nums; }
+  .spacer { flex: 1; }
+  .small {
+    font-size: 11px; font-weight: 700; letter-spacing: 1px;
+    padding: 8px 12px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line);
+  }
+  .small.down { background: var(--accent); color: #0b0d12; }
+  .icon { width: 36px; height: 36px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); font-size: 18px; }
+
+  main { display: grid; grid-template-columns: 1fr 1fr; min-height: 0; }
+  #stickZone { position: relative; overflow: hidden; }
+  #stickZone .hint, #buttons .hint {
+    position: absolute; bottom: 12px; left: 0; right: 0; text-align: center;
+    color: var(--muted); font-size: 12px; opacity: .6; pointer-events: none;
+  }
+  #stickBase {
+    position: absolute; left: 50%; top: 52%;
+    width: var(--stick); height: var(--stick); margin: calc(var(--stick) / -2) 0 0 calc(var(--stick) / -2);
+    border-radius: 50%; border: 2px solid var(--line);
+    background: radial-gradient(circle, #1a1f2c 0%, #121620 70%);
+    opacity: .55; transition: opacity .12s; pointer-events: none;
+  }
+  #stickBase.active { opacity: 1; border-color: color-mix(in srgb, var(--accent) 60%, var(--line)); }
+  #stickKnob {
+    position: absolute; left: 50%; top: 50%;
+    width: 44%; height: 44%; margin: -22% 0 0 -22%; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #fff8, transparent 60%), var(--accent);
+    box-shadow: 0 6px 18px #0008;
+  }
+
+  #buttons { position: relative; display: grid; place-items: center; }
+  .diamond {
+    display: grid; gap: calc(var(--face) * .12);
+    grid-template: repeat(3, var(--face)) / repeat(3, var(--face));
+  }
+  .face {
+    --c: var(--accent);
+    width: var(--face); height: var(--face); border-radius: 50%;
+    font-size: calc(var(--face) * .38); font-weight: 800; color: #0b0d12;
+    background: radial-gradient(circle at 35% 30%, #ffffff55, transparent 55%), var(--c);
+    box-shadow: 0 5px 0 color-mix(in srgb, var(--c) 45%, #000), 0 8px 18px #0007;
+    transition: transform .05s, box-shadow .05s, filter .05s;
+    touch-action: none;
+  }
+  .face.down {
+    transform: translateY(4px) scale(.95);
+    box-shadow: 0 1px 0 color-mix(in srgb, var(--c) 45%, #000), 0 2px 8px #0007;
+    filter: brightness(1.2);
+  }
+  .face { font-size: calc(var(--face) * .2); letter-spacing: .5px; }
+  .face[data-btn="dash"] { grid-area: 1 / 2; }
+  .face[data-btn="block"] { grid-area: 2 / 1; }
+  .face[data-btn="shoot"] { grid-area: 2 / 3; }
+  .face[data-btn="attack"] { grid-area: 3 / 2; }
+
+  #overlay {
+    position: absolute; inset: 0; display: grid; place-items: center;
+    background: #0b0d12cc; backdrop-filter: blur(3px); font-size: 17px; font-weight: 600;
+  }
+  #toast {
+    position: absolute; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom));
+    transform: translate(-50%, 20px); opacity: 0; transition: .2s;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 10px 16px; max-width: 80vw; text-align: center; pointer-events: none;
+  }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+</style>
+</head>
+<body>
+
+<section id="join" class="screen">
+  <form class="card" id="joinForm" autocomplete="off">
+    <h1>Join the game</h1>
+    <label>Your name
+      <input id="nameInput" maxlength="12" placeholder="Player" enterkeyhint="go">
+    </label>
+    <button class="primary" id="joinBtn" type="submit">Join</button>
+    <p id="joinStatus" class="muted"></p>
+  </form>
+</section>
+
+<section id="pad" class="screen hidden">
+  <header>
+    <span class="dot" id="dot"></span>
+    <span id="pname">Player</span>
+    <span id="ping" class="muted"></span>
+    <span class="spacer"></span>
+    <button class="small" data-btn="start">NEXT ROUND</button>
+    <button class="icon" id="fsBtn" aria-label="Toggle fullscreen">⛶</button>
+  </header>
+  <main>
+    <div id="stickZone">
+      <div id="stickBase"><div id="stickKnob"></div></div>
+      <span class="hint">Drag anywhere here</span>
+    </div>
+    <div id="buttons">
+      <div class="diamond">
+        <button class="face" data-btn="dash" style="--c:#ffc83d">DASH</button>
+        <button class="face" data-btn="block" style="--c:#4d9fff">BLOCK</button>
+        <button class="face" data-btn="shoot" style="--c:#ff5c5c">SHOOT</button>
+        <button class="face" data-btn="attack" style="--c:#3ddc84">ATTACK</button>
+      </div>
+    </div>
+  </main>
+  <div id="overlay" class="hidden">Reconnecting…</div>
+  <div id="toast"></div>
+</section>
+
+<script>
+(() => {
+  'use strict';
+
+  // ---------- Config ----------
+  const $ = (id) => document.getElementById(id);
+  const params = new URLSearchParams(location.search);
+  const SESSION = params.get('s') || '';
+  // The Godot server replaces this placeholder with its WebSocket port when serving the page.
+  const INJECTED_PORT = '__WS_PORT__';
+  const WS_PORT = /^\d+$/.test(INJECTED_PORT) ? INJECTED_PORT : (params.get('ws') || '8081');
+  const WS_HOST = params.get('host') || location.hostname || 'localhost';
+  const DEADZONE = 0.12;
+  const SEND_INTERVAL_MS = 16;
+  const PING_INTERVAL_MS = 2000;
+
+  const REJECT_TEXT = {
+    old_session: 'This QR code is from an older game session. Scan the code on screen again.',
+    full: 'The game is full.',
+    kicked: 'You were removed from the game.',
+    replaced: 'This controller was opened somewhere else.',
+  };
+
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+  };
+
+  // A per-session token lets a phone reclaim its player slot after a screen lock or Wi-Fi blip.
+  const tokenKey = 'pc_token_' + SESSION;
+  let token = store.get(tokenKey);
+  if (!token) {
+    const a = new Uint8Array(8);
+    crypto.getRandomValues(a);
+    token = Array.from(a, (b) => b.toString(16).padStart(2, '0')).join('');
+    store.set(tokenKey, token);
+  }
+
+  // ---------- UI helpers ----------
+  const joinStatus = $('joinStatus');
+  const dot = $('dot');
+  let toastTimer = 0;
+
+  function toast(text, ms = 2500) {
+    const el = $('toast');
+    el.textContent = text;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), ms);
+  }
+
+  function buzz(pattern) {
+    if (!navigator.vibrate) return;
+    try { navigator.vibrate(pattern); } catch {}
+  }
+
+  function setStatus(state) {
+    dot.className = 'dot ' + ({ connected: 'ok', connecting: 'warn', reconnecting: 'warn' }[state] || 'bad');
+    $('overlay').classList.toggle('hidden', !(joined && state !== 'connected'));
+    if (!joined && (state === 'connecting' || state === 'reconnecting')) {
+      joinStatus.classList.remove('error');
+      joinStatus.textContent = state === 'connecting' ? 'Connecting…' : 'Retrying…';
+    }
+  }
+
+  function showJoin(errorText) {
+    joined = false;
+    $('pad').classList.add('hidden');
+    $('join').classList.remove('hidden');
+    $('joinBtn').disabled = false;
+    joinStatus.textContent = errorText || '';
+    joinStatus.classList.toggle('error', !!errorText);
+  }
+
+  function showPad() {
+    $('join').classList.add('hidden');
+    $('pad').classList.remove('hidden');
+  }
+
+  // ---------- Networking ----------
+  let ws = null;
+  let wantConnected = false;
+  let joined = false;
+  let rejected = null;
+  let retryDelay = 500;
+  let retryTimer = 0;
+  let playerName = '';
+
+  function connect() {
+    clearTimeout(retryTimer);
+    if (ws && ws.readyState <= 1) return;
+    rejected = null;
+    setStatus(joined ? 'reconnecting' : 'connecting');
+    let sock;
+    try {
+      sock = new WebSocket(`ws://${WS_HOST}:${WS_PORT}`);
+    } catch {
+      scheduleRetry();
+      return;
+    }
+    ws = sock;
+    sock.onopen = () => {
+      retryDelay = 500;
+      send({ t: 'hello', s: SESSION, name: playerName, token });
+    };
+    sock.onmessage = (ev) => {
+      let m;
+      try { m = JSON.parse(ev.data); } catch { return; }
+      onMessage(m);
+    };
+    sock.onclose = (ev) => {
+      if (ws !== sock) return;
+      ws = null;
+      const reason = rejected || (REJECT_TEXT[ev.reason] ? ev.reason : null);
+      if (reason) {
+        wantConnected = false;
+        releaseAll(false);
+        showJoin(REJECT_TEXT[reason]);
+        setStatus('disconnected');
+        return;
+      }
+      setStatus('reconnecting');
+      scheduleRetry();
+    };
+  }
+
+  function scheduleRetry() {
+    if (!wantConnected) return;
+    clearTimeout(retryTimer);
+    retryTimer = setTimeout(connect, retryDelay);
+    retryDelay = Math.min(retryDelay * 1.6, 4000);
+  }
+
+  function send(obj) {
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj));
+  }
+
+  function onMessage(m) {
+    switch (m.t) {
+      case 'welcome':
+        joined = true;
+        if (m.color) document.documentElement.style.setProperty('--accent', m.color);
+        $('pname').textContent = m.name || 'Player ' + m.id;
+        showPad();
+        setStatus('connected');
+        buzz(30);
+        flush(true);
+        break;
+      case 'reject':
+        rejected = m.reason;
+        break;
+      case 'theme': // the game re-colours / renames this controller (e.g. to match your fighter)
+        if (m.color) document.documentElement.style.setProperty('--accent', m.color);
+        if (m.name) $('pname').textContent = m.name;
+        break;
+      case 'pong':
+        if (typeof m.ts === 'number') $('ping').textContent = Math.round(performance.now() - m.ts) + ' ms';
+        break;
+      case 'vibrate':
+        buzz(m.pattern || m.ms || 60);
+        break;
+      case 'msg':
+        toast(String(m.text || ''), m.ms || 2500);
+        break;
+    }
+  }
+
+  setInterval(() => { if (joined) send({ t: 'ping', ts: performance.now() }); }, PING_INTERVAL_MS);
+
+  // ---------- Input state ----------
+  const input = { x: 0, y: 0, held: new Set() };
+  let dirty = false;
+  let lastSent = 0;
+
+  function flush(force) {
+    if (!joined || !ws || ws.readyState !== 1) return;
+    if (!dirty && !force) return;
+    dirty = false;
+    lastSent = performance.now();
+    send({ t: 'in', x: +input.x.toFixed(3), y: +input.y.toFixed(3), b: [...input.held] });
+  }
+
+  // Buttons send immediately; stick moves are throttled to one message per SEND_INTERVAL_MS
+  // with a timer (not requestAnimationFrame, which some browsers pause or slow down).
+  let flushTimer = 0;
+  function markDirty(immediate) {
+    dirty = true;
+    const wait = SEND_INTERVAL_MS - (performance.now() - lastSent);
+    if (immediate || wait <= 0) {
+      flush();
+    } else if (!flushTimer) {
+      flushTimer = setTimeout(() => { flushTimer = 0; flush(); }, wait);
+    }
+  }
+
+  function setStick(x, y) {
+    if (x === input.x && y === input.y) return;
+    input.x = x;
+    input.y = y;
+    markDirty(false);
+  }
+
+  function press(name) {
+    if (input.held.has(name)) return;
+    input.held.add(name);
+    document.querySelectorAll(`[data-btn="${name}"]`).forEach((el) => el.classList.add('down'));
+    buzz(12);
+    markDirty(true);
+  }
+
+  function release(name) {
+    if (!input.held.delete(name)) return;
+    document.querySelectorAll(`[data-btn="${name}"]`).forEach((el) => el.classList.remove('down'));
+    markDirty(true);
+  }
+
+  function releaseAll(sendNow = true) {
+    [...input.held].forEach(release);
+    stickId = null;
+    resetStickVisual();
+    input.x = input.y = 0;
+    if (sendNow) markDirty(true);
+  }
+
+  // Capture keeps a drag/press tracked even if the finger slides off the element.
+  function capture(el, id) { try { el.setPointerCapture(id); } catch {} }
+
+  // ---------- Joystick (floating: appears where you touch) ----------
+  const zone = $('stickZone');
+  const base = $('stickBase');
+  const knob = $('stickKnob');
+  let stickId = null;
+  let ox = 0, oy = 0, radius = 50;
+
+  function resetStickVisual() {
+    base.classList.remove('active');
+    base.style.left = base.style.top = '';
+    knob.style.transform = '';
+  }
+
+  function moveStick(e) {
+    let dx = e.clientX - ox;
+    let dy = e.clientY - oy;
+    const d = Math.hypot(dx, dy);
+    if (d > radius) { dx *= radius / d; dy *= radius / d; }
+    knob.style.transform = `translate(${dx}px, ${dy}px)`;
+    let nx = dx / radius, ny = dy / radius;
+    const mag = Math.hypot(nx, ny);
+    if (mag < DEADZONE) { nx = 0; ny = 0; }
+    else { const s = (mag - DEADZONE) / (1 - DEADZONE) / mag; nx *= s; ny *= s; }
+    setStick(nx, ny); // y is positive DOWN, matching Godot's 2D axes
+  }
+
+  zone.addEventListener('pointerdown', (e) => {
+    if (stickId !== null) return;
+    e.preventDefault();
+    stickId = e.pointerId;
+    capture(zone, e.pointerId);
+    const r = zone.getBoundingClientRect();
+    const size = base.offsetWidth;
+    radius = size * 0.4;
+    // Keep the base fully on screen even when touching near an edge.
+    const cx = Math.min(Math.max(e.clientX - r.left, size / 2), r.width - size / 2);
+    const cy = Math.min(Math.max(e.clientY - r.top, size / 2), r.height - size / 2);
+    ox = r.left + cx;
+    oy = r.top + cy;
+    base.style.left = cx + 'px';
+    base.style.top = cy + 'px';
+    base.classList.add('active');
+    moveStick(e);
+  });
+  zone.addEventListener('pointermove', (e) => { if (e.pointerId === stickId) moveStick(e); });
+  const endStick = (e) => {
+    if (e.pointerId !== stickId) return;
+    stickId = null;
+    resetStickVisual();
+    setStick(0, 0);
+    markDirty(true);
+  };
+  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach((t) => zone.addEventListener(t, endStick));
+
+  // ---------- Buttons (multi-touch safe) ----------
+  document.querySelectorAll('[data-btn]').forEach((el) => {
+    const name = el.dataset.btn;
+    const pointers = new Set();
+    el.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      capture(el, e.pointerId);
+      pointers.add(e.pointerId);
+      press(name);
+    });
+    const up = (e) => {
+      if (!pointers.delete(e.pointerId)) return;
+      if (pointers.size === 0) release(name);
+    };
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach((t) => el.addEventListener(t, up));
+  });
+
+  // ---------- Keyboard (handy for testing from a laptop browser) ----------
+  const KEY_BUTTONS = { k: 'attack', l: 'shoot', j: 'block', i: 'dash', enter: 'start' };
+  const KEY_DIRS = { w: [0, -1], arrowup: [0, -1], s: [0, 1], arrowdown: [0, 1], a: [-1, 0], arrowleft: [-1, 0], d: [1, 0], arrowright: [1, 0] };
+  const keysDown = new Set();
+  function keyStick() {
+    let x = 0, y = 0;
+    keysDown.forEach((k) => { const v = KEY_DIRS[k]; if (v) { x += v[0]; y += v[1]; } });
+    const m = Math.hypot(x, y) || 1;
+    setStick(x / m, y / m);
+  }
+  addEventListener('keydown', (e) => {
+    if (!joined || e.repeat) return;
+    const k = e.key.toLowerCase();
+    if (KEY_BUTTONS[k]) { press(KEY_BUTTONS[k]); e.preventDefault(); }
+    if (KEY_DIRS[k]) { keysDown.add(k); keyStick(); e.preventDefault(); }
+  });
+  addEventListener('keyup', (e) => {
+    const k = e.key.toLowerCase();
+    if (KEY_BUTTONS[k]) release(KEY_BUTTONS[k]);
+    if (KEY_DIRS[k]) { keysDown.delete(k); keyStick(); }
+  });
+
+  // ---------- Lifecycle ----------
+  let wakeLock = null;
+  async function keepAwake() {
+    try { wakeLock = await navigator.wakeLock?.request('screen'); } catch {} // needs HTTPS; best effort
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      releaseAll(); // never leave a button stuck down while the phone is locked
+    } else if (wantConnected) {
+      keepAwake();
+      if (!ws) { retryDelay = 500; connect(); }
+    }
+  });
+  addEventListener('blur', () => releaseAll());
+
+  // Block browser gestures (pinch zoom, pull-to-refresh, long-press menus) on the pad.
+  document.addEventListener('touchmove', (e) => { if (!e.target.closest('input')) e.preventDefault(); }, { passive: false });
+  document.addEventListener('gesturestart', (e) => e.preventDefault());
+  document.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  const fsSupported = !!document.documentElement.requestFullscreen;
+  $('fsBtn').classList.toggle('hidden', !fsSupported);
+  function enterFullscreen() {
+    if (fsSupported && !document.fullscreenElement) {
+      document.documentElement.requestFullscreen({ navigationUI: 'hide' }).catch(() => {});
+    }
+  }
+  $('fsBtn').addEventListener('click', () => {
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    else enterFullscreen();
+  });
+
+  // ---------- Join ----------
+  const nameInput = $('nameInput');
+  nameInput.value = store.get('pc_name') || '';
+  if (!SESSION) {
+    joinStatus.textContent = 'Tip: open this page by scanning the QR code shown in the game.';
+  }
+
+  $('joinForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    playerName = nameInput.value.trim().slice(0, 12);
+    store.set('pc_name', playerName);
+    nameInput.blur();
+    $('joinBtn').disabled = true;
+    enterFullscreen(); // must happen inside a user gesture
+    keepAwake();
+    buzz(1);           // unlocks vibration on some browsers
+    wantConnected = true;
+    retryDelay = 500;
+    connect();
+  });
+})();
+</script>
+</body>
+</html>
